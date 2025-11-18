@@ -1,0 +1,67 @@
+-- Chọn database đã tạo trước
+\c etl_db
+
+-- Bảng search_by_jobid
+CREATE TABLE IF NOT EXISTS search_by_jobid (
+    job_id TEXT PRIMARY KEY,
+    benefits TEXT,
+    bid TEXT,
+    campaign_budget TEXT,
+    campaign_id TEXT,
+    city_name TEXT,
+    company_logo TEXT,
+    company_name TEXT,
+    description TEXT,
+    feed_id TEXT,
+    lat TEXT,
+    lon TEXT,
+    major_category TEXT,
+    minor_category TEXT,
+    pay_currentcy TEXT,
+    pay_from TEXT,
+    pay_option TEXT,
+    pay_to TEXT,
+    pay_type TEXT,
+    postal_code TEXT,
+    requirements TEXT,
+    state TEXT,
+    status TEXT,
+    title TEXT,
+    work_schedule TEXT,
+    updated_at TIMESTAMP
+);
+
+-- Bảng tracking_events
+CREATE TABLE IF NOT EXISTS tracking_events (
+    uuid TEXT PRIMARY KEY,
+    create_time TEXT,
+    bid TEXT,
+    bn TEXT,
+    campaign_id TEXT,
+    cd TEXT,
+    custom_track TEXT,
+    de TEXT,
+    dl TEXT,
+    dt TEXT,
+    ed TEXT,
+    ev TEXT,
+    group_id TEXT,
+    id TEXT,
+    job_id TEXT,
+    md TEXT,
+    publisher_id TEXT,
+    rl TEXT,
+    sr TEXT,
+    ts TEXT,
+    tz TEXT,
+    ua TEXT,
+    uid TEXT,
+    utm_campaign TEXT,
+    utm_content TEXT,
+    utm_medium TEXT,
+    utm_source TEXT,
+    utm_term TEXT,
+    v TEXT,
+    vp TEXT,
+    updated_at TEXT
+);
