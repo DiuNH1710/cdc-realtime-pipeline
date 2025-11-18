@@ -1,33 +1,31 @@
 #!/bin/bash
-
-# Debezium REST API
 DEBEZIUM_URL="http://localhost:8083/connectors"
 
-# Function to create connector for a table
 create_connector() {
   local connector_name=$1
-  local table_name=$2
+  local table_list=$2
 
-  curl -X POST -H "Content-Type: application/json" $DEBEZIUM_URL --data "{
+  curl -s -X POST -H "Content-Type: application/json" $DEBEZIUM_URL --data "{
     \"name\": \"$connector_name\",
     \"config\": {
       \"connector.class\": \"io.debezium.connector.postgresql.PostgresConnector\",
+      \"tasks.max\": \"1\",
       \"plugin.name\": \"pgoutput\",
       \"database.hostname\": \"postgres\",
       \"database.port\": \"5432\",
-      \"database.user\": \"postgres\",
-      \"database.password\": \"postgres\",
-      \"database.dbname\": \"ecommerce\",
-      \"database.server.name\": \"postgres\",
-      \"table.include.list\": \"public.$table_name\",
-      \"topic.prefix\": \"cdc\",
+      \"database.user\": \"debezium\",
+      \"database.password\": \"debezium\",
+      \"database.dbname\": \"etl_db\",
+      \"database.server.name\": \"cdc\",
+      \"publication.name\": \"dbz_pub\",
+      \"slot.name\": \"cdc_slot\",
+      \"table.include.list\": \"$table_list\",
+      \"tombstones.on.delete\": \"false\",
       \"decimal.handling.mode\": \"string\"
     }
   }"
-  echo -e "\nConnector $connector_name created for table $table_name"
+  echo -e "\nConnector $connector_name creation requested."
 }
 
-
-# 1. Sale report
-#create_connector "sale_report_conn" "sale_report"
-
+# Gọi: truyền danh sách bảng, ví dụ "public.tracking_events,public.search_by_jobid"
+create_connector "cdc_tracking_conn" "public.tracking_events,public.search_by_jobid"
