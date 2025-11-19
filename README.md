@@ -7,7 +7,7 @@ Hai tệp dữ liệu tracking.csv và search.csv đóng vai trò nguồn sự k
 Spark Streaming tiếp nhận dữ liệu từ Kafka, thực hiện bước transform & enrich, rồi ghi kết quả đã xử lý vào MySQL.
 Cuối cùng, Grafana sử dụng MySQL làm datasource để trực quan hóa dữ liệu theo thời gian thực (real-time dashboards).
 
-![image_9.PNG](images%2Fimage_9.PNG)
+![Capture.PNG](images%2FCapture.PNG)
 ## 📁 Project Structure
 ```
 realtime-cdc-pipeline-prj2/
