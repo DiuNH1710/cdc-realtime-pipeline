@@ -119,3 +119,4 @@ networks:
 
 volumes:
   pg-data:
+  grafana-data:

@@ -39,7 +39,7 @@ df_parsed = df.selectExpr("CAST(value AS STRING) as json_str") \
     .select(get_json_object(col("json_str"), "$.payload.after").alias("after_json")) \
     .select(from_json(col("after_json"), schema).alias("data")) \
     .select("data.*") \
-    .filter(col("uuid").isNotNull())   # uuid là NOT NULL
+    .filter(col("uuid").isNotNull())
 
 # Hàm ghi xuống MySQL
 def write_to_mysql(batch_df, epoch_id):

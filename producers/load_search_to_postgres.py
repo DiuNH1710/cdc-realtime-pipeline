@@ -60,7 +60,7 @@ def load_search_csv(file_path, offset_file):
         print(f"[SEARCH] Inserted row {idx + 1}: job_id={row['job_id']}")
         write_offset(offset_file, idx + 1)  # checkpoint = index + 1
 
-        time.sleep(1)  # delay giả lập realtime
+        time.sleep(0.2)  # delay giả lập realtime
 
 # ---------- MAIN -------------
 if __name__ == "__main__":
