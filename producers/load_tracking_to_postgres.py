@@ -1,19 +1,23 @@
-import csv
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
 import psycopg2
-from datetime import datetime
 import uuid
 import os
 import time
-from dateutil import parser
+from datetime import datetime
 
-# kết nối Postgres
+# =============================
+# POSTGRES CONNECTION
+# =============================
 conn = psycopg2.connect(
     host="localhost", port=5433, database="etl_db", user="postgres", password="123456"
 )
 conn.autocommit = True
 cursor = conn.cursor()
 
-# checkpoint
+# =============================
+# CHECKPOINT
+# =============================
 def read_offset(path):
     if not os.path.exists(path):
         return 0
@@ -25,80 +29,108 @@ def write_offset(path, value):
     with open(path, "w") as f:
         f.write(str(value))
 
-# helper
-def parse_datetime(val):
-    if val is None or val == '':
+# =============================
+# CLEAN HELPERS
+# =============================
+def clean_str(val):
+    if val is None:
         return None
-    try:
-        return parser.parse(val)
-    except:
-        return None
+    val = str(val).strip()
+    return val if val != "" else None
 
-def none_if_empty(val):
-    if val is None or val.strip() == '':
-        return None
-    return val.strip()
+# =============================
+# MAIN LOAD FUNCTION
+# =============================
+def load_tracking_csv_spark(csv_path, offset_file):
 
-# insert tracking
-def load_tracking_csv(file_path, offset_file):
+    spark = (
+        SparkSession.builder
+        .appName("TrackingCSVLoader")
+        .master("local[*]")
+        .getOrCreate()
+    )
+
+    # Read with | delimiter and disable quote/escape
+    df = (
+        spark.read
+        .option("header", True)
+        .option("delimiter", "|")
+        .option("quote", "\u0000")   # disable quotes
+        .option("escape", "\u0000")  # disable escaping
+        .csv(csv_path)
+    )
+
+    # Fix header vp; -> vp if present
+    cols = df.columns
+    fixed_cols = [c.rstrip(";") for c in cols]
+    if fixed_cols != cols:
+        df = df.toDF(*fixed_cols)
+
+    # Trim leading/trailing quotes from all string columns
+    for c in df.columns:
+        df = df.withColumn(
+            c,
+            F.when(F.col(c).isNotNull(),
+                   F.regexp_replace(F.regexp_replace(F.col(c), r'^"', ''), r'"$', '')
+            ).otherwise(F.col(c))
+        )
+
+    total = df.count()
+    print(f"\n🔵 Spark loaded {total} rows\n")
+    df.printSchema()
+    df.show(5, truncate=False)
+
+    last_offset = read_offset(offset_file)
+    print(f"\n🟡 Starting from offset: {last_offset}\n")
+
+    rows = df.collect()
+
     columns = [
         'create_time','bid','bn','campaign_id','cd','custom_track','de','dl','dt','ed',
         'ev','group_id','id','job_id','md','publisher_id','rl','sr','ts','tz','ua','uid',
         'utm_campaign','utm_content','utm_medium','utm_source','utm_term','v','vp'
     ]
 
-    last_offset = read_offset(offset_file)
+    for idx, row in enumerate(rows[last_offset:], start=last_offset):
+        print("\n===== 🔹 SPARK ROW 🔹 =====")
+        print(row.asDict())
+        print("===========================\n")
 
-    with open(file_path, encoding='utf-8') as f:
-        raw_lines = f.readlines()
-        clean_lines = []
+        uuid_key = str(uuid.uuid4())
+        values = []
 
-        for raw in raw_lines:
-            line = raw.strip()
+        for col_name in columns:
+            val = row[col_name] if col_name in row else None
+            values.append(clean_str(val))
 
-            # 1. bỏ ký tự " ở đầu dòng
-            if line.startswith('"'):
-                line = line[1:]
+        # Add uuid at beginning + timestamp at end
+        values.insert(0, uuid_key)
+        values.append(datetime.now().isoformat())
 
-            # 2. bỏ dấu ;;; hoặc ;; ở cuối
-            while line.endswith(';'):
-                line = line[:-1]
+        placeholders = ",".join(["%s"] * len(values))
+        sql = f"""
+            INSERT INTO tracking_events (
+                uuid, {",".join(columns)}, updated_at
+            ) VALUES ({placeholders})
+        """
 
-            clean_lines.append(line)
+        try:
+            cursor.execute(sql, tuple(values))
+            print(f"✅ Inserted row {idx} uuid={uuid_key}")
+        except Exception as e:
+            print(f"❌ ERROR row {idx}: {e}")
+            continue
 
-        reader = csv.DictReader(clean_lines)
+        write_offset(offset_file, idx + 1)
+        time.sleep(2)
 
-        rows = list(reader)[last_offset:]
-        print(f"[TRACKING] Inserting {len(rows)} new rows starting from offset {last_offset}...")
+    print("\n🎉 DONE LOADING CSV with Spark!\n")
+    spark.stop()
 
-        for idx, row in enumerate(rows):
-            uuid_key = str(uuid.uuid4())
-            values = []
-
-            for col in columns:
-                val = row.get(col)
-                if col == 'create_time':
-                    values.append(parse_datetime(val))
-                else:
-                    values.append(none_if_empty(val))
-
-            values.insert(0, uuid_key)
-            values.append(datetime.now())
-
-            placeholders = ','.join(['%s'] * len(values))
-            sql = f"INSERT INTO tracking_events (uuid, {','.join(columns)}, updated_at) VALUES ({placeholders})"
-
-            try:
-                cursor.execute(sql, tuple(values))
-            except Exception as e:
-                print(f"[ERROR] Row {last_offset + idx + 1}: {e}")
-                continue
-
-            write_offset(offset_file, last_offset + idx + 1)
-            print(f"[TRACKING] Inserted row {last_offset + idx + 1}: uuid={uuid_key}")
-            time.sleep(1)
-# main
+# =============================
+# RUN
+# =============================
 if __name__ == "__main__":
-    load_tracking_csv("csv_files/tracking.csv", "checkpoint/tracking_offset.txt")
+    load_tracking_csv_spark("csv_files/tracking_clean.csv", "checkpoint/tracking_offset.txt")
     cursor.close()
     conn.close()
