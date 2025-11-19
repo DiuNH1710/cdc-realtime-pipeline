@@ -100,6 +100,19 @@ services:
     networks:
       - cdc-net
 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    networks:
+      - cdc-net
+    volumes:
+      - grafana-data:/var/lib/grafana
+
 networks:
   cdc-net:
     driver: bridge
